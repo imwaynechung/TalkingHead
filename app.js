@@ -121,21 +121,27 @@ function loadVoices() {
   });
 }
 
-async function speak(text) {
+function speak(text) {
   if (!text.trim()) return;
+  if (!head) {
+    alert('Please load an avatar first!');
+    return;
+  }
 
   try {
-    elements.subtitles.textContent = text;
+    isSpeaking = true;
+    updatePlaybackButtons();
+
+    const selectedVoice = currentVoice || availableVoices[elements.voiceSelect.value];
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = currentVoice || availableVoices[elements.voiceSelect.value];
+    utterance.voice = selectedVoice;
     utterance.rate = parseFloat(elements.rateSlider.value);
     utterance.pitch = parseFloat(elements.pitchSlider.value);
     utterance.volume = parseFloat(elements.volumeSlider.value);
 
     utterance.onstart = () => {
-      isSpeaking = true;
-      updatePlaybackButtons();
+      console.log('Speech started');
     };
 
     utterance.onend = () => {
@@ -145,22 +151,22 @@ async function speak(text) {
     };
 
     utterance.onerror = (error) => {
-      console.error('Speech synthesis error:', error);
+      console.error('Speech error:', error);
       isSpeaking = false;
       updatePlaybackButtons();
     };
 
-    if (head) {
-      await head.speakText(text, {
-        ttsLang: utterance.voice?.lang || 'en-US',
-        ttsVoice: utterance.voice?.name,
-        ttsRate: utterance.rate,
-        ttsPitch: utterance.pitch,
-        ttsVolume: utterance.volume
-      });
-    } else {
-      speechSynthesis.speak(utterance);
-    }
+    elements.subtitles.textContent = text;
+    speechSynthesis.speak(utterance);
+
+    head.speakText(text, {
+      lipsyncLang: 'en',
+      avatarMute: true
+    }, (textNode) => {
+      if (textNode && textNode.textContent) {
+        elements.subtitles.textContent = textNode.textContent;
+      }
+    });
 
   } catch (error) {
     console.error('Error speaking:', error);
@@ -179,7 +185,12 @@ function updatePlaybackButtons() {
 async function setPose(poseName) {
   if (!head) return;
   try {
-    await head.setMood(poseName);
+    const poseTemplate = head.poseTemplates[poseName];
+    if (poseTemplate) {
+      head.setPoseFromTemplate(poseTemplate, 2000);
+    } else {
+      console.warn(`Pose '${poseName}' not found`);
+    }
   } catch (error) {
     console.error('Error setting pose:', error);
   }
@@ -206,8 +217,7 @@ async function setMood(moodName) {
 async function setCameraView(viewName) {
   if (!head) return;
   try {
-    head.opt.cameraView = viewName;
-    head.updateView();
+    head.setView(viewName);
   } catch (error) {
     console.error('Error setting camera view:', error);
   }
@@ -343,21 +353,24 @@ elements.speakBtn.addEventListener('click', () => {
 });
 
 elements.pauseBtn.addEventListener('click', () => {
-  if (head && head.isSpeaking) {
-    head.stopSpeaking();
-  }
   speechSynthesis.pause();
+  if (head) {
+    head.pauseSpeaking();
+  }
 });
 
 elements.resumeBtn.addEventListener('click', () => {
   speechSynthesis.resume();
+  if (head) {
+    head.resumeSpeaking();
+  }
 });
 
 elements.stopBtn.addEventListener('click', () => {
-  if (head && head.isSpeaking) {
+  speechSynthesis.cancel();
+  if (head) {
     head.stopSpeaking();
   }
-  speechSynthesis.cancel();
   isSpeaking = false;
   elements.subtitles.textContent = '';
   updatePlaybackButtons();
