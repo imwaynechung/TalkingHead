@@ -184,9 +184,20 @@ The `profiles` table stores user settings:
 
 ### No Speech Output
 - Check system volume
-- Verify browser has speech synthesis support
-- Try selecting a different voice
-- Ensure the avatar isn't muted
+- Verify browser has speech synthesis support (most modern browsers support it)
+- Try selecting a different voice from the dropdown
+- Ensure the "Mute" checkbox is not checked
+- The app requires a user interaction first (clicking a button) before audio can play
+- If you see speech errors in the console, the app will automatically try a fallback mode
+- Try refreshing the page if voices don't load properly
+- Some browsers may have limited voice support - check the voice dropdown for available options
+
+### Lip-Sync Not Working
+- Lip-sync is handled separately from audio and should work even without sound
+- Make sure the avatar is fully loaded before trying to speak
+- Check browser console for TalkingHead library errors
+- Try the mute checkbox - lips should still move when muted
+- Speech audio comes from Web Speech API, lip-sync comes from TalkingHead library
 
 ### Profiles Won't Save
 - Verify Supabase configuration

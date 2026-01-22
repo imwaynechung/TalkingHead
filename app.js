@@ -106,6 +106,12 @@ async function loadAvatar(avatarUrl) {
 
 function loadVoices() {
   availableVoices = speechSynthesis.getVoices();
+
+  if (availableVoices.length === 0) {
+    console.warn('No voices available yet, will retry...');
+    return;
+  }
+
   elements.voiceSelect.innerHTML = '';
 
   availableVoices.forEach((voice, index) => {
@@ -119,6 +125,13 @@ function loadVoices() {
       elements.voiceSelect.value = index;
     }
   });
+
+  if (!currentVoice && availableVoices.length > 0) {
+    currentVoice = availableVoices[0];
+    elements.voiceSelect.value = 0;
+  }
+
+  console.log(`Loaded ${availableVoices.length} voices`);
 }
 
 function speak(text) {
@@ -128,36 +141,82 @@ function speak(text) {
     return;
   }
 
+  if (availableVoices.length === 0) {
+    loadVoices();
+  }
+
+  speechSynthesis.cancel();
+
+  if (head) {
+    head.stopSpeaking();
+  }
+
   try {
     isSpeaking = true;
     updatePlaybackButtons();
+    elements.subtitles.textContent = text;
 
     const selectedVoice = currentVoice || availableVoices[elements.voiceSelect.value];
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.voice = selectedVoice;
-    utterance.rate = parseFloat(elements.rateSlider.value);
-    utterance.pitch = parseFloat(elements.pitchSlider.value);
-    utterance.volume = parseFloat(elements.volumeSlider.value);
+    if (!elements.muteCheckbox.checked) {
+      const utterance = new SpeechSynthesisUtterance(text);
 
-    utterance.onstart = () => {
-      console.log('Speech started');
-    };
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
 
-    utterance.onend = () => {
-      isSpeaking = false;
-      elements.subtitles.textContent = '';
-      updatePlaybackButtons();
-    };
+      utterance.rate = parseFloat(elements.rateSlider.value);
+      utterance.pitch = parseFloat(elements.pitchSlider.value);
+      utterance.volume = parseFloat(elements.volumeSlider.value);
 
-    utterance.onerror = (error) => {
-      console.error('Speech error:', error);
-      isSpeaking = false;
-      updatePlaybackButtons();
-    };
+      utterance.onstart = () => {
+        console.log('Speech started');
+      };
 
-    elements.subtitles.textContent = text;
-    speechSynthesis.speak(utterance);
+      utterance.onend = () => {
+        isSpeaking = false;
+        elements.subtitles.textContent = '';
+        updatePlaybackButtons();
+      };
+
+      utterance.onerror = (error) => {
+        console.error('Speech synthesis error:', error.error || error.message || 'Unknown error');
+        if (error.error !== 'interrupted' && error.error !== 'canceled') {
+          console.log('Attempting speech without specific voice...');
+          const fallbackUtterance = new SpeechSynthesisUtterance(text);
+          fallbackUtterance.rate = utterance.rate;
+          fallbackUtterance.pitch = utterance.pitch;
+          fallbackUtterance.volume = utterance.volume;
+          fallbackUtterance.onend = utterance.onend;
+          fallbackUtterance.onerror = () => {
+            isSpeaking = false;
+            elements.subtitles.textContent = '';
+            updatePlaybackButtons();
+          };
+          setTimeout(() => speechSynthesis.speak(fallbackUtterance), 50);
+        } else {
+          isSpeaking = false;
+          elements.subtitles.textContent = '';
+          updatePlaybackButtons();
+        }
+      };
+
+      setTimeout(() => {
+        try {
+          speechSynthesis.speak(utterance);
+        } catch (e) {
+          console.error('Failed to speak:', e);
+          isSpeaking = false;
+          updatePlaybackButtons();
+        }
+      }, 50);
+    } else {
+      setTimeout(() => {
+        isSpeaking = false;
+        elements.subtitles.textContent = '';
+        updatePlaybackButtons();
+      }, text.length * 100);
+    }
 
     head.speakText(text, {
       lipsyncLang: 'en',
@@ -169,8 +228,9 @@ function speak(text) {
     });
 
   } catch (error) {
-    console.error('Error speaking:', error);
+    console.error('Error in speak function:', error);
     isSpeaking = false;
+    elements.subtitles.textContent = '';
     updatePlaybackButtons();
   }
 }
