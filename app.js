@@ -92,6 +92,9 @@ async function loadAvatar(avatarUrl) {
 
     elements.loading.classList.add('hidden');
     console.log('Avatar loaded successfully');
+    console.log('TalkingHead instance:', head);
+    console.log('TalkingHead speakText method exists:', typeof head.speakText);
+    console.log('TalkingHead stopSpeaking method exists:', typeof head.stopSpeaking);
 
     localStorage.setItem('lastAvatarUrl', avatarUrl);
 
@@ -235,10 +238,15 @@ function speak(text) {
       }, text.length * 100);
     }
 
+    console.log('Calling head.speakText with text:', text);
+    console.log('Head object exists:', !!head);
+    console.log('Head object:', head);
+
     head.speakText(text, {
       lipsyncLang: 'en',
       avatarMute: true
     }, (textNode) => {
+      console.log('Lip-sync callback fired, textNode:', textNode);
       if (textNode && textNode.textContent) {
         elements.subtitles.textContent = textNode.textContent;
       }
