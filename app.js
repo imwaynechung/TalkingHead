@@ -11,6 +11,7 @@ let head = null;
 let currentVoice = 'alloy';
 let isSpeaking = false;
 let isProcessing = false;
+let currentAudio = null;
 
 const elements = {
   avatarContainer: document.getElementById('avatar-container'),
@@ -149,23 +150,61 @@ async function speak(text) {
       speed: speed
     });
 
+    console.log('Generated audio URL:', audioUrl);
+    console.log('Mute checkbox:', elements.muteCheckbox.checked);
+
     elements.subtitles.textContent = text;
+
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio.currentTime = 0;
+      currentAudio = null;
+    }
+
+    currentAudio = new Audio(audioUrl);
+    currentAudio.volume = parseFloat(elements.volumeSlider.value);
+
+    const playPromise = currentAudio.play();
+
+    if (playPromise !== undefined) {
+      await playPromise.catch(err => {
+        console.error('Audio playback error:', err);
+        throw new Error('Failed to play audio. Please check your browser permissions.');
+      });
+    }
 
     await head.speakAudio(audioUrl, {
       lipsyncLang: 'en',
-      avatarMute: elements.muteCheckbox.checked
+      avatarMute: true
     }, (textNode) => {
       if (textNode && textNode.textContent) {
         elements.subtitles.textContent = textNode.textContent;
       }
     });
 
-    setTimeout(() => {
+    currentAudio.addEventListener('ended', () => {
       isSpeaking = false;
       elements.subtitles.textContent = '';
       updatePlaybackButtons();
       URL.revokeObjectURL(audioUrl);
-    }, 500);
+      if (currentAudio) {
+        currentAudio.remove();
+        currentAudio = null;
+      }
+    });
+
+    if (currentAudio.paused && currentAudio.currentTime === 0) {
+      setTimeout(() => {
+        isSpeaking = false;
+        elements.subtitles.textContent = '';
+        updatePlaybackButtons();
+        URL.revokeObjectURL(audioUrl);
+        if (currentAudio) {
+          currentAudio.remove();
+          currentAudio = null;
+        }
+      }, 500);
+    }
 
   } catch (error) {
     console.error('Error in speak function:', error);
@@ -357,17 +396,28 @@ elements.pauseBtn.addEventListener('click', () => {
   if (head) {
     head.pauseSpeaking();
   }
+  if (currentAudio) {
+    currentAudio.pause();
+  }
 });
 
 elements.resumeBtn.addEventListener('click', () => {
   if (head) {
     head.resumeSpeaking();
   }
+  if (currentAudio) {
+    currentAudio.play();
+  }
 });
 
 elements.stopBtn.addEventListener('click', () => {
   if (head) {
     head.stopSpeaking();
+  }
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
   }
   isSpeaking = false;
   elements.subtitles.textContent = '';
