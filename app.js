@@ -1,5 +1,6 @@
 import { TalkingHead } from './modules/talkinghead.mjs';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { generateSpeech, OPENAI_VOICES } from './modules/openai-tts.mjs';
 
 const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
@@ -7,8 +8,7 @@ const supabase = createClient(
 );
 
 let head = null;
-let currentVoice = null;
-let availableVoices = [];
+let currentVoice = 'alloy';
 let isSpeaking = false;
 let isProcessing = false;
 
@@ -106,36 +106,20 @@ async function loadAvatar(avatarUrl) {
 }
 
 function loadVoices() {
-  availableVoices = speechSynthesis.getVoices();
-
-  if (availableVoices.length === 0) {
-    console.warn('No voices available yet, will retry...');
-    return;
-  }
-
   elements.voiceSelect.innerHTML = '';
 
-  availableVoices.forEach((voice, index) => {
+  OPENAI_VOICES.forEach((voice) => {
     const option = document.createElement('option');
-    option.value = index;
-    option.textContent = `${voice.name} (${voice.lang})`;
+    option.value = voice.id;
+    option.textContent = voice.name;
     elements.voiceSelect.appendChild(option);
-
-    if (voice.lang.startsWith('en') && !currentVoice) {
-      currentVoice = voice;
-      elements.voiceSelect.value = index;
-    }
   });
 
-  if (!currentVoice && availableVoices.length > 0) {
-    currentVoice = availableVoices[0];
-    elements.voiceSelect.value = 0;
-  }
-
-  console.log(`Loaded ${availableVoices.length} voices`);
+  elements.voiceSelect.value = currentVoice;
+  console.log(`Loaded ${OPENAI_VOICES.length} OpenAI voices`);
 }
 
-function speak(text) {
+async function speak(text) {
   if (!text.trim()) return;
   if (!head) {
     alert('Please load an avatar first!');
@@ -147,108 +131,50 @@ function speak(text) {
     return;
   }
 
-  if (availableVoices.length === 0) {
-    loadVoices();
-  }
-
   isProcessing = true;
-
-  speechSynthesis.cancel();
 
   if (head) {
     head.stopSpeaking();
   }
 
-  setTimeout(() => {
-    isProcessing = false;
-  }, 200);
-
   try {
     isSpeaking = true;
     updatePlaybackButtons();
+    elements.subtitles.textContent = 'Generating speech...';
+
+    const speed = parseFloat(elements.rateSlider.value);
+
+    const audioUrl = await generateSpeech(text, {
+      voice: currentVoice,
+      speed: speed
+    });
+
     elements.subtitles.textContent = text;
 
-    const selectedVoice = currentVoice || availableVoices[elements.voiceSelect.value];
-
-    if (!elements.muteCheckbox.checked) {
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
-      }
-
-      utterance.rate = parseFloat(elements.rateSlider.value);
-      utterance.pitch = parseFloat(elements.pitchSlider.value);
-      utterance.volume = parseFloat(elements.volumeSlider.value);
-
-      utterance.onstart = () => {
-        console.log('Speech started');
-      };
-
-      utterance.onend = () => {
-        isSpeaking = false;
-        elements.subtitles.textContent = '';
-        updatePlaybackButtons();
-      };
-
-      utterance.onerror = (error) => {
-        if (error.error === 'interrupted' || error.error === 'canceled') {
-          isSpeaking = false;
-          elements.subtitles.textContent = '';
-          updatePlaybackButtons();
-          return;
-        }
-
-        console.error('Speech synthesis error:', error.error || error.message || 'Unknown error');
-        console.log('Attempting speech without specific voice...');
-
-        const fallbackUtterance = new SpeechSynthesisUtterance(text);
-        fallbackUtterance.rate = utterance.rate;
-        fallbackUtterance.pitch = utterance.pitch;
-        fallbackUtterance.volume = utterance.volume;
-        fallbackUtterance.onend = utterance.onend;
-        fallbackUtterance.onerror = (fallbackError) => {
-          if (fallbackError.error !== 'interrupted' && fallbackError.error !== 'canceled') {
-            console.error('Fallback speech also failed:', fallbackError.error);
-          }
-          isSpeaking = false;
-          elements.subtitles.textContent = '';
-          updatePlaybackButtons();
-        };
-        setTimeout(() => speechSynthesis.speak(fallbackUtterance), 50);
-      };
-
-      setTimeout(() => {
-        try {
-          speechSynthesis.speak(utterance);
-        } catch (e) {
-          console.error('Failed to speak:', e);
-          isSpeaking = false;
-          updatePlaybackButtons();
-        }
-      }, 50);
-    } else {
-      setTimeout(() => {
-        isSpeaking = false;
-        elements.subtitles.textContent = '';
-        updatePlaybackButtons();
-      }, text.length * 100);
-    }
-
-    head.speakText(text, {
+    await head.speakAudio(audioUrl, {
       lipsyncLang: 'en',
-      avatarMute: false
+      avatarMute: elements.muteCheckbox.checked
     }, (textNode) => {
       if (textNode && textNode.textContent) {
         elements.subtitles.textContent = textNode.textContent;
       }
     });
 
+    setTimeout(() => {
+      isSpeaking = false;
+      elements.subtitles.textContent = '';
+      updatePlaybackButtons();
+      URL.revokeObjectURL(audioUrl);
+    }, 500);
+
   } catch (error) {
     console.error('Error in speak function:', error);
     isSpeaking = false;
-    elements.subtitles.textContent = '';
+    elements.subtitles.textContent = `Error: ${error.message}`;
     updatePlaybackButtons();
+    alert(`Speech generation failed: ${error.message}`);
+  } finally {
+    isProcessing = false;
   }
 }
 
@@ -309,7 +235,7 @@ async function saveProfile() {
 
   const profile = {
     name: profileName,
-    voice: elements.voiceSelect.value,
+    voice: currentVoice,
     rate: elements.rateSlider.value,
     pitch: elements.pitchSlider.value,
     volume: elements.volumeSlider.value,
@@ -364,6 +290,7 @@ async function loadSelectedProfile() {
     const profile = JSON.parse(selected);
 
     elements.voiceSelect.value = profile.voice;
+    currentVoice = profile.voice;
     elements.rateSlider.value = profile.rate;
     elements.rateValue.textContent = profile.rate;
     elements.pitchSlider.value = profile.pitch;
@@ -375,8 +302,6 @@ async function loadSelectedProfile() {
     elements.headMoveSlider.value = profile.headMove;
     elements.headMoveValue.textContent = profile.headMove;
     elements.muteCheckbox.checked = profile.mute;
-
-    currentVoice = availableVoices[profile.voice];
 
     if (head) {
       head.opt.avatarSpeakingEyeContact = parseFloat(profile.eyeContact);
@@ -415,7 +340,6 @@ async function deleteSelectedProfile() {
   }
 }
 
-speechSynthesis.addEventListener('voiceschanged', loadVoices);
 loadVoices();
 
 document.querySelectorAll('[data-message]').forEach(btn => {
@@ -430,21 +354,18 @@ elements.speakBtn.addEventListener('click', () => {
 });
 
 elements.pauseBtn.addEventListener('click', () => {
-  speechSynthesis.pause();
   if (head) {
     head.pauseSpeaking();
   }
 });
 
 elements.resumeBtn.addEventListener('click', () => {
-  speechSynthesis.resume();
   if (head) {
     head.resumeSpeaking();
   }
 });
 
 elements.stopBtn.addEventListener('click', () => {
-  speechSynthesis.cancel();
   if (head) {
     head.stopSpeaking();
   }
@@ -454,7 +375,7 @@ elements.stopBtn.addEventListener('click', () => {
 });
 
 elements.voiceSelect.addEventListener('change', () => {
-  currentVoice = availableVoices[elements.voiceSelect.value];
+  currentVoice = elements.voiceSelect.value;
 });
 
 elements.rateSlider.addEventListener('input', (e) => {
