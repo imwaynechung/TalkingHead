@@ -6,7 +6,7 @@ export async function generateSpeech(text, options = {}) {
   }
 
   const {
-    model = 'gpt-4o-audio-preview',
+    model = 'tts-1',
     voice = 'alloy',
     speed = 1.0
   } = options;
