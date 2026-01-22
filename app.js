@@ -11,7 +11,6 @@ let head = null;
 let currentVoice = 'alloy';
 let isSpeaking = false;
 let isProcessing = false;
-let currentAudio = null;
 
 const elements = {
   avatarContainer: document.getElementById('avatar-container'),
@@ -153,58 +152,28 @@ async function speak(text) {
     console.log('Generated audio URL:', audioUrl);
     console.log('Mute checkbox:', elements.muteCheckbox.checked);
 
+    if (head && head.audioNode) {
+      const volume = parseFloat(elements.volumeSlider.value);
+      head.audioNode.gain.value = elements.muteCheckbox.checked ? 0 : volume;
+    }
+
     elements.subtitles.textContent = text;
-
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-      currentAudio = null;
-    }
-
-    currentAudio = new Audio(audioUrl);
-    currentAudio.volume = parseFloat(elements.volumeSlider.value);
-
-    const playPromise = currentAudio.play();
-
-    if (playPromise !== undefined) {
-      await playPromise.catch(err => {
-        console.error('Audio playback error:', err);
-        throw new Error('Failed to play audio. Please check your browser permissions.');
-      });
-    }
 
     await head.speakAudio(audioUrl, {
       lipsyncLang: 'en',
-      avatarMute: true
+      avatarMute: false
     }, (textNode) => {
       if (textNode && textNode.textContent) {
         elements.subtitles.textContent = textNode.textContent;
       }
     });
 
-    currentAudio.addEventListener('ended', () => {
+    setTimeout(() => {
       isSpeaking = false;
       elements.subtitles.textContent = '';
       updatePlaybackButtons();
       URL.revokeObjectURL(audioUrl);
-      if (currentAudio) {
-        currentAudio.remove();
-        currentAudio = null;
-      }
-    });
-
-    if (currentAudio.paused && currentAudio.currentTime === 0) {
-      setTimeout(() => {
-        isSpeaking = false;
-        elements.subtitles.textContent = '';
-        updatePlaybackButtons();
-        URL.revokeObjectURL(audioUrl);
-        if (currentAudio) {
-          currentAudio.remove();
-          currentAudio = null;
-        }
-      }, 500);
-    }
+    }, 500);
 
   } catch (error) {
     console.error('Error in speak function:', error);
@@ -396,28 +365,17 @@ elements.pauseBtn.addEventListener('click', () => {
   if (head) {
     head.pauseSpeaking();
   }
-  if (currentAudio) {
-    currentAudio.pause();
-  }
 });
 
 elements.resumeBtn.addEventListener('click', () => {
   if (head) {
     head.resumeSpeaking();
   }
-  if (currentAudio) {
-    currentAudio.play();
-  }
 });
 
 elements.stopBtn.addEventListener('click', () => {
   if (head) {
     head.stopSpeaking();
-  }
-  if (currentAudio) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-    currentAudio = null;
   }
   isSpeaking = false;
   elements.subtitles.textContent = '';
@@ -438,6 +396,9 @@ elements.pitchSlider.addEventListener('input', (e) => {
 
 elements.volumeSlider.addEventListener('input', (e) => {
   elements.volumeValue.textContent = e.target.value;
+  if (head && head.audioNode && !elements.muteCheckbox.checked) {
+    head.audioNode.gain.value = parseFloat(e.target.value);
+  }
 });
 
 elements.eyeContactSlider.addEventListener('input', (e) => {
@@ -459,6 +420,10 @@ elements.headMoveSlider.addEventListener('input', (e) => {
 elements.muteCheckbox.addEventListener('change', (e) => {
   if (head) {
     head.opt.avatarMute = e.target.checked;
+    if (head.audioNode) {
+      const volume = parseFloat(elements.volumeSlider.value);
+      head.audioNode.gain.value = e.target.checked ? 0 : volume;
+    }
   }
 });
 
