@@ -168,12 +168,10 @@ async function speak(text) {
       }
     });
 
-    setTimeout(() => {
-      isSpeaking = false;
-      elements.subtitles.textContent = '';
-      updatePlaybackButtons();
-      URL.revokeObjectURL(audioUrl);
-    }, 500);
+    isSpeaking = false;
+    elements.subtitles.textContent = '';
+    updatePlaybackButtons();
+    URL.revokeObjectURL(audioUrl);
 
   } catch (error) {
     console.error('Error in speak function:', error);
