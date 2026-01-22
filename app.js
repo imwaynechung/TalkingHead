@@ -10,6 +10,7 @@ let head = null;
 let currentVoice = null;
 let availableVoices = [];
 let isSpeaking = false;
+let isProcessing = false;
 
 const elements = {
   avatarContainer: document.getElementById('avatar-container'),
@@ -141,15 +142,26 @@ function speak(text) {
     return;
   }
 
+  if (isProcessing) {
+    console.log('Already processing speech, please wait...');
+    return;
+  }
+
   if (availableVoices.length === 0) {
     loadVoices();
   }
+
+  isProcessing = true;
 
   speechSynthesis.cancel();
 
   if (head) {
     head.stopSpeaking();
   }
+
+  setTimeout(() => {
+    isProcessing = false;
+  }, 200);
 
   try {
     isSpeaking = true;
@@ -180,25 +192,30 @@ function speak(text) {
       };
 
       utterance.onerror = (error) => {
-        console.error('Speech synthesis error:', error.error || error.message || 'Unknown error');
-        if (error.error !== 'interrupted' && error.error !== 'canceled') {
-          console.log('Attempting speech without specific voice...');
-          const fallbackUtterance = new SpeechSynthesisUtterance(text);
-          fallbackUtterance.rate = utterance.rate;
-          fallbackUtterance.pitch = utterance.pitch;
-          fallbackUtterance.volume = utterance.volume;
-          fallbackUtterance.onend = utterance.onend;
-          fallbackUtterance.onerror = () => {
-            isSpeaking = false;
-            elements.subtitles.textContent = '';
-            updatePlaybackButtons();
-          };
-          setTimeout(() => speechSynthesis.speak(fallbackUtterance), 50);
-        } else {
+        if (error.error === 'interrupted' || error.error === 'canceled') {
           isSpeaking = false;
           elements.subtitles.textContent = '';
           updatePlaybackButtons();
+          return;
         }
+
+        console.error('Speech synthesis error:', error.error || error.message || 'Unknown error');
+        console.log('Attempting speech without specific voice...');
+
+        const fallbackUtterance = new SpeechSynthesisUtterance(text);
+        fallbackUtterance.rate = utterance.rate;
+        fallbackUtterance.pitch = utterance.pitch;
+        fallbackUtterance.volume = utterance.volume;
+        fallbackUtterance.onend = utterance.onend;
+        fallbackUtterance.onerror = (fallbackError) => {
+          if (fallbackError.error !== 'interrupted' && fallbackError.error !== 'canceled') {
+            console.error('Fallback speech also failed:', fallbackError.error);
+          }
+          isSpeaking = false;
+          elements.subtitles.textContent = '';
+          updatePlaybackButtons();
+        };
+        setTimeout(() => speechSynthesis.speak(fallbackUtterance), 50);
       };
 
       setTimeout(() => {
