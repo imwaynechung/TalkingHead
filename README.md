@@ -31,6 +31,7 @@ An interactive web application featuring a 3D avatar with real-time lip-sync, sp
 ### Prerequisites
 - Modern web browser with WebGL support
 - Internet connection (for avatar loading and Supabase)
+- Ready Player Me avatar (free to create)
 
 ### Installation
 
@@ -46,13 +47,34 @@ npm run build
 
 This creates an optimized build in the `dist` folder.
 
+## How to Get Your Avatar
+
+### Option 1: Create Your Own Avatar
+
+1. Visit [Ready Player Me](https://readyplayer.me/avatar)
+2. Follow the instructions to create your custom 3D avatar
+3. Once created, you'll get a URL like: `https://models.readyplayer.me/YOUR_ID.glb`
+4. Copy this URL
+5. Paste it into the app and click "Load Avatar"
+
+### Option 2: Use Sample Avatar
+
+Click the "Try Sample Avatar" button to instantly load a demo avatar and start exploring features.
+
 ## How to Use
+
+### Loading Your Avatar
+
+1. **Paste Avatar URL**: Copy your Ready Player Me avatar URL into the input field
+2. **Click Load Avatar**: The 3D avatar will begin loading
+3. **Wait**: Loading takes 5-15 seconds depending on your connection
+4. **Start Interacting**: Once loaded, all controls become active
 
 ### Basic Usage
 
-1. **Wait for Avatar to Load**: The 3D avatar will appear once loading completes
-2. **Try Quick Messages**: Click any of the "Hello", "Features", "About", or "Goodbye" buttons
-3. **Watch the Magic**: The avatar speaks with synchronized lip movements and displays subtitles
+1. **Try Quick Messages**: Click "Hello", "Features", "About", or "Goodbye" buttons
+2. **Watch the Magic**: The avatar speaks with synchronized lip movements and displays subtitles
+3. **Experiment**: Try different poses, gestures, and moods
 
 ### Custom Messages
 
@@ -146,19 +168,29 @@ The `profiles` table stores user settings:
 ## Troubleshooting
 
 ### Avatar Won't Load
-- Check internet connection
-- Ensure browser supports WebGL
-- Try refreshing the page
+- **Check the URL**: Make sure you're using a valid Ready Player Me URL
+- **Try sample avatar**: Click "Try Sample Avatar" to verify the app works
+- **Check internet**: Ensure you have a stable connection
+- **Browser compatibility**: Ensure your browser supports WebGL
+- **CORS issues**: Ready Player Me avatars must be accessed from their official domain
+- **Refresh**: If all else fails, refresh the page and try again
+
+### Invalid Avatar URL
+- The URL must start with `https://models.readyplayer.me/`
+- It should end with `.glb`
+- The morphTargets parameter is added automatically
 
 ### No Speech Output
 - Check system volume
 - Verify browser has speech synthesis support
 - Try selecting a different voice
+- Ensure the avatar isn't muted
 
 ### Profiles Won't Save
 - Verify Supabase configuration
 - Check browser console for errors
 - Ensure database table exists
+- Check internet connection
 
 ## Future Enhancements
 

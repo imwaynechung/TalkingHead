@@ -14,6 +14,12 @@ let isSpeaking = false;
 const elements = {
   avatarContainer: document.getElementById('avatar-container'),
   loading: document.getElementById('loading'),
+  loadingSpinner: document.getElementById('loading-spinner'),
+  loadingText: document.getElementById('loading-text'),
+  errorText: document.getElementById('error-text'),
+  avatarUrlInput: document.getElementById('avatar-url-input'),
+  loadAvatarBtn: document.getElementById('load-avatar-btn'),
+  useSampleBtn: document.getElementById('use-sample-btn'),
   subtitles: document.getElementById('subtitles'),
   customText: document.getElementById('custom-text'),
   speakBtn: document.getElementById('speak-btn'),
@@ -39,23 +45,37 @@ const elements = {
   deleteProfileBtn: document.getElementById('delete-profile-btn')
 };
 
-async function initAvatar() {
+async function loadAvatar(avatarUrl) {
   try {
-    head = new TalkingHead(elements.avatarContainer, {
-      ttsLang: "en-US",
-      lipsyncLang: "en",
-      cameraView: "full",
-      cameraDistance: 0.5,
-      cameraY: 0.2,
-      avatarMood: "neutral",
-      avatarMute: false,
-      avatarIdleEyeContact: 0.5,
-      avatarIdleHeadMove: 0.5,
-      avatarSpeakingEyeContact: 0.5,
-      avatarSpeakingHeadMove: 0.5
-    });
+    document.querySelector('.avatar-url-section').style.display = 'none';
+    elements.loadingSpinner.style.display = 'block';
+    elements.loadingText.style.display = 'block';
+    elements.loadingText.textContent = 'Initializing 3D engine...';
+    elements.errorText.style.display = 'none';
 
-    const avatarUrl = 'https://models.readyplayer.me/6748f4a2c59c5b60cfb46d80.glb?morphTargets=ARKit';
+    if (!head) {
+      head = new TalkingHead(elements.avatarContainer, {
+        ttsLang: "en-US",
+        lipsyncLang: "en",
+        cameraView: "full",
+        cameraDistance: 0.5,
+        cameraY: 0.2,
+        avatarMood: "neutral",
+        avatarMute: false,
+        avatarIdleEyeContact: 0.5,
+        avatarIdleHeadMove: 0.5,
+        avatarSpeakingEyeContact: 0.5,
+        avatarSpeakingHeadMove: 0.5
+      });
+    }
+
+    if (!avatarUrl.includes('?')) {
+      avatarUrl += '?morphTargets=ARKit';
+    } else if (!avatarUrl.includes('morphTargets')) {
+      avatarUrl += '&morphTargets=ARKit';
+    }
+
+    elements.loadingText.textContent = 'Loading avatar model...';
 
     await head.showAvatar({
       url: avatarUrl,
@@ -63,15 +83,24 @@ async function initAvatar() {
       avatarMood: 'neutral',
       lipsyncLang: 'en'
     }, (ev) => {
-      console.log('Loading progress:', ev);
+      const progress = ev.lengthComputable ? Math.round((ev.loaded / ev.total) * 100) : 0;
+      if (progress > 0) {
+        elements.loadingText.textContent = `Loading avatar... ${progress}%`;
+      }
     });
 
     elements.loading.classList.add('hidden');
     console.log('Avatar loaded successfully');
 
+    localStorage.setItem('lastAvatarUrl', avatarUrl);
+
   } catch (error) {
     console.error('Error loading avatar:', error);
-    elements.loading.innerHTML = '<p style="color: red;">Error loading avatar. Please refresh the page.</p>';
+    elements.loadingSpinner.style.display = 'none';
+    elements.loadingText.style.display = 'none';
+    elements.errorText.style.display = 'block';
+    elements.errorText.textContent = `Error: ${error.message}. Please check the URL and try again.`;
+    document.querySelector('.avatar-url-section').style.display = 'block';
   }
 }
 
@@ -404,5 +433,42 @@ elements.saveProfileBtn.addEventListener('click', saveProfile);
 elements.loadProfileBtn.addEventListener('click', loadSelectedProfile);
 elements.deleteProfileBtn.addEventListener('click', deleteSelectedProfile);
 
-initAvatar();
+elements.loadAvatarBtn.addEventListener('click', () => {
+  const url = elements.avatarUrlInput.value.trim();
+  if (!url) {
+    elements.errorText.style.display = 'block';
+    elements.errorText.textContent = 'Please enter an avatar URL';
+    return;
+  }
+  if (!url.startsWith('https://models.readyplayer.me/')) {
+    elements.errorText.style.display = 'block';
+    elements.errorText.textContent = 'Please enter a valid Ready Player Me URL';
+    return;
+  }
+  loadAvatar(url);
+});
+
+elements.useSampleBtn.addEventListener('click', () => {
+  const sampleUrl = 'https://models.readyplayer.me/65d95c869a2b0bfcf8cf7af3.glb';
+  loadAvatar(sampleUrl);
+});
+
+elements.avatarUrlInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    elements.loadAvatarBtn.click();
+  }
+});
+
+const lastAvatarUrl = localStorage.getItem('lastAvatarUrl');
+if (lastAvatarUrl) {
+  elements.avatarUrlInput.value = lastAvatarUrl;
+  const urlSection = document.querySelector('.avatar-url-section');
+  const autoLoadMsg = document.createElement('p');
+  autoLoadMsg.style.color = '#667eea';
+  autoLoadMsg.style.fontWeight = '600';
+  autoLoadMsg.style.marginTop = '15px';
+  autoLoadMsg.textContent = 'Your last avatar URL has been loaded. Click "Load Avatar" to use it again.';
+  urlSection.appendChild(autoLoadMsg);
+}
+
 loadProfiles();

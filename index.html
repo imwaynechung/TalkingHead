@@ -17,8 +17,27 @@
       <div class="avatar-section">
         <div id="avatar-container"></div>
         <div id="loading" class="loading">
-          <div class="spinner"></div>
-          <p>Loading avatar...</p>
+          <div class="loading-content">
+            <h2>Welcome to TalkingHead Demo!</h2>
+            <p>To get started, you need a Ready Player Me avatar.</p>
+            <div class="avatar-url-section">
+              <h3>Step 1: Create Your Avatar</h3>
+              <p>Visit <a href="https://readyplayer.me/avatar" target="_blank" rel="noopener">Ready Player Me</a> to create your free 3D avatar.</p>
+              <p>After creating, copy the GLB URL and paste it below.</p>
+
+              <h3>Step 2: Load Your Avatar</h3>
+              <input type="text" id="avatar-url-input" placeholder="Paste your Ready Player Me GLB URL here..." />
+              <p class="url-hint">Example: https://models.readyplayer.me/YOUR_ID.glb</p>
+              <button id="load-avatar-btn" class="btn-success">Load Avatar</button>
+
+              <p class="or-divider">OR</p>
+
+              <button id="use-sample-btn" class="btn-primary">Try Sample Avatar</button>
+            </div>
+            <div id="loading-spinner" class="spinner" style="display: none;"></div>
+            <p id="loading-text" style="display: none;">Loading avatar...</p>
+            <p id="error-text" class="error-text" style="display: none;"></p>
+          </div>
         </div>
         <div id="subtitles" class="subtitles"></div>
       </div>
